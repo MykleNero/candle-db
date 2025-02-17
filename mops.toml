@@ -1,0 +1,10 @@
+[package]
+name = "candle-db"
+version = "1.0.0"
+description = "Relational Database"
+repository = ""
+keywords = [ ]
+license = "MIT"
+
+[dependencies]
+base = "0.14.1"
