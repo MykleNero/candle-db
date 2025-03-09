@@ -1,9 +1,8 @@
-import HashMap "mo:base/HashMap";
 import Result "mo:base/Result";
 import Nat32 "mo:base/Nat32";
 import Text "mo:base/Text";
 import Buffer "mo:base/Buffer";
-import Iter "mo:base/Iter";
+import Map "mo:map/Map";
 
 module Collection {
     type Result<T, E> = Result.Result<T, E>;
@@ -38,13 +37,13 @@ module Collection {
         };
     };
 
-    public type Schema = HashMap.HashMap<Text, SchemaField>;
+    public type Schema = Map.Map<Text, SchemaField>;
     public type Values = [(name : Text, val : FieldValue)];
-    type SchemaValidationError = (fieldName : Text, msg : Text);
+    public type SchemaValidationError = (fieldName : Text, msg : Text);
 
     public class Collection() {
-        public let schema : Schema = HashMap.HashMap(0, Text.equal, Text.hash);
-        public let data = HashMap.HashMap<Nat32, Values>(0, Nat32.equal, func(x) { x });
+        public let schema : Schema = Map.new();
+        public let data = Map.new<Nat32, Values>();
         public var idCounter : Nat32 = 0;
     };
 
@@ -52,9 +51,9 @@ module Collection {
         collection : Collection,
         field : SchemaField,
     ) : Result<(), { #FieldAlreadyExists }> {
-        switch (collection.schema.get(field.name)) {
+        switch (Map.get(collection.schema, Map.thash, field.name)) {
             case (null) {
-                collection.schema.put(field.name, field);
+                ignore Map.put(collection.schema, Map.thash, field.name, field);
                 #ok;
             };
             case (?_) {
@@ -88,23 +87,82 @@ module Collection {
 
     public func insert(
         collection : Collection,
-        input : [(Text, FieldValue)],
+        input : Values,
     ) : Result.Result<PrimaryKey, { #SchemaValidationError : [SchemaValidationError] }> {
         collection.idCounter += 1;
         let pk = collection.idCounter;
-        let values = HashMap.fromIter<Text, FieldValue>(
+        // Add the primary key to the input
+        let inputBuf = Buffer.fromArray<(Text, FieldValue)>(input);
+        inputBuf.add(("id", #nat32(pk)));
+        let finalInput = Buffer.toArray(inputBuf);
+        switch (validateInputAgainstSchema(finalInput, collection.schema)) {
+            case (#err(err)) { return #err(err) };
+            case (#ok) {};
+        };
+        ignore Map.put(collection.data, Map.n32hash, pk, finalInput);
+        return #ok(pk);
+    };
+
+    public func delete(collection : Collection, id : PrimaryKey) : () {
+        Map.delete(collection.data, Map.n32hash, id);
+    };
+
+    public func find(collection : Collection, id : PrimaryKey) : ?Values {
+        let result = Map.get(collection.data, Map.n32hash, id);
+        switch result {
+            case (null) { return null };
+            case (val) { return val };
+        };
+    };
+
+    public func filter(
+        collection : Collection,
+        predicate : (pk : PrimaryKey, item : Values) -> Bool,
+    ) : [(PrimaryKey, Values)] {
+        var result = Buffer.Buffer<(PrimaryKey, Values)>(0);
+        for ((pk, item) in Map.entries(collection.data)) {
+            if (predicate(pk, item)) {
+                result.add((pk, item));
+            };
+        };
+        return Buffer.toArray(result);
+    };
+
+    public func update(
+        collection : Collection,
+        id : PrimaryKey,
+        input : Values,
+    ) : Result.Result<(), { #NotFound }> {
+        let existing = find(collection, id);
+
+        switch (existing) {
+            case (?_) {
+                ignore Map.put(collection.data, Map.n32hash, id, input);
+                #ok;
+            };
+            case (null) { #err(#NotFound) };
+        };
+    };
+
+    public func getFieldSchema(collection : Collection, fieldName : Text) : ?SchemaField {
+        return Map.get(collection.schema, Map.thash, fieldName);
+    };
+
+    public func validateInputAgainstSchema(
+        input : [(Text, FieldValue)],
+        schema : Schema,
+    ) : Result<(), { #SchemaValidationError : [SchemaValidationError] }> {
+        let values = Map.fromIter<Text, FieldValue>(
             input.vals(),
-            input.size(),
-            Text.equal,
-            Text.hash,
+            Map.thash,
         );
         let validationErrors = Buffer.Buffer<SchemaValidationError>(
             input.size()
         );
 
         // Validate input against schema
-        label _loop for ((fieldName, field) in collection.schema.entries()) {
-            let value = values.get(fieldName);
+        label _loop for ((fieldName, field) in Map.entries(schema)) {
+            let value = Map.get(values, Map.thash, fieldName);
 
             switch (value) {
                 case (null) {
@@ -117,7 +175,7 @@ module Collection {
                                 };
                                 case (?x) { x };
                             };
-                            values.put(fieldName, #bool(defaultValue));
+                            ignore Map.put(values, Map.thash, fieldName, #bool(defaultValue));
                         };
                         case (#nat32(conf)) {
                             let defaultValue : Nat32 = switch (conf.defaultValue) {
@@ -127,10 +185,10 @@ module Collection {
                                 };
                                 case (?x) { x };
                             };
-                            values.put(fieldName, #nat32(defaultValue));
+                            ignore Map.put(values, Map.thash, fieldName, #nat32(defaultValue));
                         };
                         case (#nat32Null(conf)) {
-                            values.put(fieldName, #nat32Null(conf.defaultValue));
+                            ignore Map.put(values, Map.thash, fieldName, #nat32Null(conf.defaultValue));
                         };
                         case (#text(conf)) {
                             let defaultValue : Text = switch (conf.defaultValue) {
@@ -140,10 +198,10 @@ module Collection {
                                 };
                                 case (?x) { x };
                             };
-                            values.put(fieldName, #text(defaultValue));
+                            ignore Map.put(values, Map.thash, fieldName, #text(defaultValue));
                         };
                         case (#textNull(conf)) {
-                            values.put(fieldName, #textNull(conf.defaultValue));
+                            ignore Map.put(values, Map.thash, fieldName, #textNull(conf.defaultValue));
                         };
                     };
                 };
@@ -198,48 +256,6 @@ module Collection {
             return #err(#SchemaValidationError(Buffer.toArray<SchemaValidationError>(validationErrors)));
         };
 
-        collection.data.put(pk, Iter.toArray(values.entries()));
-        return #ok(pk);
-    };
-
-    public func delete(collection : Collection, id : PrimaryKey) : () {
-        collection.data.delete(id);
-    };
-
-    public func find(collection : Collection, id : PrimaryKey) : ?Values {
-        let result = collection.data.get(id);
-        switch result {
-            case (null) { return null };
-            case (val) { return val };
-        };
-    };
-
-    public func filter(
-        collection : Collection,
-        predicate : (pk : PrimaryKey, item : Values) -> Bool,
-    ) : [(PrimaryKey, Values)] {
-        var result = Buffer.Buffer<(PrimaryKey, Values)>(0);
-        for ((pk, item) in collection.data.entries()) {
-            if (predicate(pk, item)) {
-                result.add((pk, item));
-            };
-        };
-        return Buffer.toArray(result);
-    };
-
-    public func update(
-        collection : Collection,
-        id : PrimaryKey,
-        input : Values,
-    ) : Result.Result<(), { #NotFound }> {
-        let existing = find(collection, id);
-
-        switch (existing) {
-            case (?_) {
-                collection.data.put(id, input);
-                #ok;
-            };
-            case (null) { #err(#NotFound) };
-        };
+        return #ok;
     };
 };
