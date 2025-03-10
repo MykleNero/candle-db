@@ -3,6 +3,7 @@ import Nat32 "mo:base/Nat32";
 import Text "mo:base/Text";
 import Buffer "mo:base/Buffer";
 import Float "mo:base/Float";
+import Iter "mo:base/Iter";
 import Map "mo:map/Map";
 
 module Collection {
@@ -114,6 +115,10 @@ module Collection {
 
     public func delete(collection : Collection, id : PrimaryKey) : () {
         Map.delete(collection.data, Map.n32hash, id);
+    };
+
+    public func all(collection : Collection) : [(PrimaryKey, Values)] {
+        return Iter.toArray(Map.entries(collection.data));
     };
 
     public func find(collection : Collection, id : PrimaryKey) : ?Values {
