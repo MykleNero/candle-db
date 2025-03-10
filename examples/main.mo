@@ -4,7 +4,6 @@ import Debug "mo:base/Debug";
 import Collection "../src/collection";
 import Database "../src/database";
 
-// actor {
 type PrimaryKey = Nat32;
 
 type User = {
@@ -84,7 +83,7 @@ ignore Collection.addSchemaFields(
         },
         {
             name = "projectId";
-            dataType = #nat32Null({ defaultValue = null });
+            dataType = #nat32Opt({ defaultValue = null });
         },
     ],
 );
@@ -130,7 +129,7 @@ func addTask(task : Task) : () {
         ("title", #text(task.title)),
         ("description", #text(task.description)),
         ("completed", #bool(task.completed)),
-        ("projectId", #nat32Null(task.projectId)),
+        ("projectId", #nat32Opt(task.projectId)),
     ];
     ignore Database.insert(db, "tasks", values);
 };
@@ -199,13 +198,11 @@ func getUsersAssignedToTask(taskId : PrimaryKey) : [(PrimaryKey, [(Text, Collect
 
 addUser({ name = "Alice" });
 addUser({ name = "Bob" });
-
 addProject({
     name = "Project 1";
     description = "Description 1";
     creatorId = 1;
 });
-
 addTask({
     title = "Task 1";
     description = "Description 1";
@@ -218,11 +215,8 @@ addTask({
     completed = true;
     projectId = null;
 });
-
 assignTask(1, 1);
 assignTask(2, 2);
 
 let assigned = getUsersAssignedToTask(1);
 Debug.print(debug_show (assigned));
-
-// };

@@ -7,4 +7,8 @@ keywords = [ ]
 license = "MIT"
 
 [dependencies]
+base = "0.14.1"
 map = "9.0.1"
+
+[dev-dependencies]
+motoko-matchers = "https://github.com/kritzcreek/motoko-matchers#v1.3.1@5ba5f52bd9a5649dedf5e2a1ccd55d98ed7ff982"

@@ -2,6 +2,7 @@ import Result "mo:base/Result";
 import Nat32 "mo:base/Nat32";
 import Text "mo:base/Text";
 import Buffer "mo:base/Buffer";
+import Float "mo:base/Float";
 import Map "mo:map/Map";
 
 module Collection {
@@ -10,10 +11,12 @@ module Collection {
 
     public type FieldValue = {
         #bool : Bool;
+        #float : Float;
+        #floatOpt : ?Float;
         #nat32 : Nat32;
-        #nat32Null : ?Nat32;
+        #nat32Opt : ?Nat32;
         #text : Text;
-        #textNull : ?Text;
+        #textOpt : ?Text;
     };
 
     type SchemaField = {
@@ -22,16 +25,22 @@ module Collection {
             #bool : {
                 defaultValue : ?Bool;
             };
+            #float : {
+                defaultValue : ?Float;
+            };
+            #floatOpt : {
+                defaultValue : ?Float;
+            };
             #nat32 : {
                 defaultValue : ?Nat32;
             };
-            #nat32Null : {
+            #nat32Opt : {
                 defaultValue : ?Nat32;
             };
             #text : {
                 defaultValue : ?Text;
             };
-            #textNull : {
+            #textOpt : {
                 defaultValue : ?Text;
             };
         };
@@ -177,6 +186,19 @@ module Collection {
                             };
                             ignore Map.put(values, Map.thash, fieldName, #bool(defaultValue));
                         };
+                        case (#float(conf)) {
+                            let defaultValue : Float = switch (conf.defaultValue) {
+                                case (null) {
+                                    validationErrors.add((fieldName, "Missing required field"));
+                                    continue _loop;
+                                };
+                                case (?x) { x };
+                            };
+                            ignore Map.put(values, Map.thash, fieldName, #float(defaultValue));
+                        };
+                        case (#floatOpt(conf)) {
+                            ignore Map.put(values, Map.thash, fieldName, #floatOpt(conf.defaultValue));
+                        };
                         case (#nat32(conf)) {
                             let defaultValue : Nat32 = switch (conf.defaultValue) {
                                 case (null) {
@@ -187,8 +209,8 @@ module Collection {
                             };
                             ignore Map.put(values, Map.thash, fieldName, #nat32(defaultValue));
                         };
-                        case (#nat32Null(conf)) {
-                            ignore Map.put(values, Map.thash, fieldName, #nat32Null(conf.defaultValue));
+                        case (#nat32Opt(conf)) {
+                            ignore Map.put(values, Map.thash, fieldName, #nat32Opt(conf.defaultValue));
                         };
                         case (#text(conf)) {
                             let defaultValue : Text = switch (conf.defaultValue) {
@@ -200,8 +222,8 @@ module Collection {
                             };
                             ignore Map.put(values, Map.thash, fieldName, #text(defaultValue));
                         };
-                        case (#textNull(conf)) {
-                            ignore Map.put(values, Map.thash, fieldName, #textNull(conf.defaultValue));
+                        case (#textOpt(conf)) {
+                            ignore Map.put(values, Map.thash, fieldName, #textOpt(conf.defaultValue));
                         };
                     };
                 };
@@ -215,6 +237,22 @@ module Collection {
                                 };
                             };
                         };
+                        case (#float(_)) {
+                            switch (value) {
+                                case (#float(_)) {};
+                                case (_) {
+                                    validationErrors.add((fieldName, "Expected float"));
+                                };
+                            };
+                        };
+                        case (#floatOpt(_)) {
+                            switch (value) {
+                                case (#floatOpt(_)) {};
+                                case (_) {
+                                    validationErrors.add((fieldName, "Expected floatOpt"));
+                                };
+                            };
+                        };
                         case (#nat32(_)) {
                             switch (value) {
                                 case (#nat32(_)) {};
@@ -223,11 +261,11 @@ module Collection {
                                 };
                             };
                         };
-                        case (#nat32Null(_)) {
+                        case (#nat32Opt(_)) {
                             switch (value) {
-                                case (#nat32Null(_)) {};
+                                case (#nat32Opt(_)) {};
                                 case (_) {
-                                    validationErrors.add((fieldName, "Expected nat32Null"));
+                                    validationErrors.add((fieldName, "Expected nat32Opt"));
                                 };
                             };
                         };
@@ -239,11 +277,11 @@ module Collection {
                                 };
                             };
                         };
-                        case (#textNull(_)) {
+                        case (#textOpt(_)) {
                             switch (value) {
-                                case (#textNull(_)) {};
+                                case (#textOpt(_)) {};
                                 case (_) {
-                                    validationErrors.add((fieldName, "Expected textNull"));
+                                    validationErrors.add((fieldName, "Expected textOpt"));
                                 };
                             };
                         };
